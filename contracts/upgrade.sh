@@ -14,8 +14,8 @@ if [ -z "${BSC_RPC_URL:-}" ] || [ -z "${BSCSCAN_API_KEY:-}" ]; then
   exit 1
 fi
 
-echo "========== Step 1: Upgrade Meme =========="
-forge script script/UpgradeInvestmentFacet.s.sol:UpgradeInvestmentFacet \
+echo "========== Upgrade: Add useAave toggle =========="
+forge script script/UpgradeUseAave.s.sol:UpgradeUseAave \
   --rpc-url "$BSC_RPC_URL" \
   --broadcast \
   -vvv \

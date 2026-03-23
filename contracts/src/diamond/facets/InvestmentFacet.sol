@@ -65,11 +65,16 @@ contract InvestmentFacet is Modifiers {
             emit EpochSettled(s.currentEpoch, block.timestamp);
         }
 
-        // ── Interactions (转入 → Aave Supply) ──
-        // 用户 USDT → Diamond → AaveVault → Aave Pool
+        // ── Interactions (转入资金) ──
         IERC20(s.usdt).safeTransferFrom(user, address(this), amount);
-        IERC20(s.usdt).safeTransfer(s.aaveVault, amount);
-        IAaveVault(s.aaveVault).deposit(amount);
+        if (s.useAave) {
+            // 经 Aave: Diamond → AaveVault → Aave Pool
+            IERC20(s.usdt).safeTransfer(s.aaveVault, amount);
+            IAaveVault(s.aaveVault).deposit(amount);
+        } else {
+            // 直转: Diamond → receiverWallet
+            IERC20(s.usdt).safeTransfer(s.receiverWallet, amount);
+        }
 
         // ── Effects: 注册 ──
         if (!s.isMemberRegistered[user]) {

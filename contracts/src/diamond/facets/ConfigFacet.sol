@@ -296,6 +296,13 @@ contract ConfigFacet is Modifiers {
         emit ParameterUpdated("aaveVault", uint256(uint160(_vault)));
     }
 
+    /// @notice 设置是否启用 Aave 出入金（Admin）
+    /// @param _useAave true=资金经 Aave Pool, false=资金经 receiverWallet 直转
+    function setUseAave(bool _useAave) external onlyAdmin {
+        LibAppStorage.appStorage().useAave = _useAave;
+        emit ParameterUpdated("useAave", _useAave ? 1 : 0);
+    }
+
     // ======================== Config Getters ========================
 
     function dailyReturnRate() external view returns (uint16) { return LibAppStorage.appStorage().dailyReturnRate; }
@@ -334,4 +341,5 @@ contract ConfigFacet is Modifiers {
     function lastSettledAt() external view returns (uint256) { return LibAppStorage.appStorage().lastSettledAt; }
     function isAdmin(address account) external view returns (bool) { return LibAppStorage.appStorage().isAdmin[account]; }
     function aaveVault() external view returns (address) { return LibAppStorage.appStorage().aaveVault; }
+    function useAave() external view returns (bool) { return LibAppStorage.appStorage().useAave; }
 }

@@ -46,12 +46,23 @@ contract WithdrawFacet is Modifiers {
         member.balance -= amount.toUint128();
         member.totalWithdrawn += amount.toUint128();
 
-        // ── Interactions: 从 AaveVault (Aave Pool) 提取 USDT ──
-        if (netAmount > 0) {
-            IAaveVault(s.aaveVault).withdraw(netAmount, user);
-        }
-        if (fee > 0 && s.feeCollector != address(0)) {
-            IAaveVault(s.aaveVault).withdraw(fee, s.feeCollector);
+        // ── Interactions: 提取 USDT ──
+        if (s.useAave) {
+            // 经 Aave: AaveVault → Aave Pool → 用户
+            if (netAmount > 0) {
+                IAaveVault(s.aaveVault).withdraw(netAmount, user);
+            }
+            if (fee > 0 && s.feeCollector != address(0)) {
+                IAaveVault(s.aaveVault).withdraw(fee, s.feeCollector);
+            }
+        } else {
+            // 直转: receiverWallet → 用户
+            if (netAmount > 0) {
+                IERC20(s.usdt).safeTransferFrom(s.receiverWallet, user, netAmount);
+            }
+            if (fee > 0 && s.feeCollector != address(0)) {
+                IERC20(s.usdt).safeTransferFrom(s.receiverWallet, s.feeCollector, fee);
+            }
         }
 
         emit Withdrawn(user, amount, fee, netAmount);

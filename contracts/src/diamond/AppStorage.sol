@@ -150,6 +150,9 @@ struct AppStorage {
     // ======================== Aave 集成 (V3 追加) ========================
     address aaveVault;              // AaveVault 代理地址（入金 supply / 出金 withdraw）
 
+    // ======================== Aave 开关 (V4 追加) ========================
+    bool useAave;                   // 是否启用 Aave 出入金（true=经 Aave, false=经 receiverWallet）
+
     // ⚠️ 新字段只能追加在此处！
 }
 

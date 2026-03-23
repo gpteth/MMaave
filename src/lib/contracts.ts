@@ -1,0 +1,15 @@
+// BSC Mainnet deployed addresses
+export const ADDRESSES = {
+  // External tokens (BSC Mainnet)
+  USDT: "0x334131aAf73dcD9e3c0929e3De11cf9220fA72a6",
+  BCK_TOKEN: "0xaf3ec3c879fec5517d47c26c454fd0316cbfc6c8",
+
+  // Deployed Diamond contracts (BSC Mainnet)
+  MEMEPLUS: "0xB3197881Cd985bDd7D442F03d534FC37169e0C96",
+  PANCAKE_SWAPPER: "0x9E5ED5D51ccd324410c55a514bF6BD8E291B44Ee",
+  FEE_COLLECTOR: "0x63769e7288Ae3f9524e5159C19203BE5eBB1f0F7",
+  RECEIVER_WALLET: "0x769ddC8B629a6D8158Cd6B2f335aE33fe9544fBF",
+} as const;
+
+// USDT has 18 decimals on BSC
+export const USDT_DECIMALS = 18;

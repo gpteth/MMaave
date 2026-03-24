@@ -56,7 +56,20 @@ contract UpgradeUseAave is Script {
         IDiamondCut(DIAMOND).diamondCut(replaceCuts, address(0), "");
         console.log("[OK] diamondCut Replace done");
 
-        // 3. Add 新选择器: setUseAave + useAave
+        // 3. Remove 旧 setDynamicPoolSplit(uint16,uint16) 选择器 (签名已变更为3参数)
+        IDiamondCut.FacetCut[] memory removeCuts = new IDiamondCut.FacetCut[](1);
+        bytes4[] memory removeSelectors = new bytes4[](1);
+        removeSelectors[0] = bytes4(0x885ced94); // old setDynamicPoolSplit(uint16,uint16)
+        removeCuts[0] = IDiamondCut.FacetCut({
+            facetAddress: address(0),
+            action: IDiamondCut.FacetCutAction.Remove,
+            functionSelectors: removeSelectors
+        });
+
+        IDiamondCut(DIAMOND).diamondCut(removeCuts, address(0), "");
+        console.log("[OK] diamondCut Remove old setDynamicPoolSplit done");
+
+        // 4. Add 新选择器: setUseAave + useAave + setDynamicPoolSplit(uint16,uint16,uint16)
         IDiamondCut.FacetCut[] memory addCuts = new IDiamondCut.FacetCut[](1);
         addCuts[0] = IDiamondCut.FacetCut({
             facetAddress: address(newConfigFacet),
@@ -65,9 +78,9 @@ contract UpgradeUseAave is Script {
         });
 
         IDiamondCut(DIAMOND).diamondCut(addCuts, address(0), "");
-        console.log("[OK] diamondCut Add setUseAave + useAave done");
+        console.log("[OK] diamondCut Add new selectors done");
 
-        // 4. 验证
+        // 5. 验证
         require(ConfigFacet(DIAMOND).useAave() == false, "useAave should default to false");
         console.log("[OK] useAave default = false (verified)");
 
@@ -119,7 +132,8 @@ contract UpgradeUseAave is Script {
         buf[i++] = ConfigFacet.setStaticDynamicSplit.selector;
         buf[i++] = ConfigFacet.setStaticDistribution.selector;
         buf[i++] = ConfigFacet.setReferralRates.selector;
-        buf[i++] = ConfigFacet.setDynamicPoolSplit.selector;
+        // setDynamicPoolSplit 签名从 (uint16,uint16) 变为 (uint16,uint16,uint16)
+        // 旧选择器 0x885ced94 需要 Remove，新选择器通过 Add 添加
         buf[i++] = ConfigFacet.setCapMultiplier.selector;
         buf[i++] = ConfigFacet.setWithdrawalFee.selector;
         buf[i++] = ConfigFacet.setMinInvestment.selector;
@@ -186,8 +200,9 @@ contract UpgradeUseAave is Script {
 
     /// @dev ConfigFacet 新增选择器 (Add)
     function _getConfigAddSelectors() internal pure returns (bytes4[] memory s) {
-        s = new bytes4[](2);
+        s = new bytes4[](3);
         s[0] = ConfigFacet.setUseAave.selector;
         s[1] = ConfigFacet.useAave.selector;
+        s[2] = ConfigFacet.setDynamicPoolSplit.selector; // 新签名 (uint16,uint16,uint16)
     }
 }

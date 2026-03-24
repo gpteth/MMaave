@@ -100,6 +100,13 @@ export default function WalletPage() {
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   };
 
+  const formatSource = (source: string) => {
+    if (source.startsWith("0x") && source.length === 42) {
+      return `${source.slice(0, 6)}...${source.slice(-4)}`;
+    }
+    return source;
+  };
+
   if (!isConnected) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -352,7 +359,7 @@ export default function WalletPage() {
                 >
                   <div>
                     <p className="text-sm font-medium">{record.name}</p>
-                    <p className="text-xs text-muted">{formatTime(record.timestamp)}</p>
+                    <p className="text-xs text-muted">{formatSource(record.source)} · {formatTime(record.timestamp)}</p>
                   </div>
                   <span className={`font-mono text-sm font-bold ${
                     record.amount.startsWith("-") ? "text-danger" : "text-success"
@@ -369,6 +376,7 @@ export default function WalletPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>{t("wallet.incomeName")}</TableHead>
+                    <TableHead>來源</TableHead>
                     <TableHead className="text-right">{t("wallet.incomeAmount")}</TableHead>
                     <TableHead className="text-right">{t("wallet.incomeTime")}</TableHead>
                   </TableRow>
@@ -377,6 +385,9 @@ export default function WalletPage() {
                   {records.map((record, i) => (
                     <TableRow key={i}>
                       <TableCell>{record.name}</TableCell>
+                      <TableCell className="text-muted font-mono text-xs">
+                        {formatSource(record.source)}
+                      </TableCell>
                       <TableCell
                         className={`text-right font-mono font-bold ${
                           record.amount.startsWith("-") ? "text-danger" : "text-success"

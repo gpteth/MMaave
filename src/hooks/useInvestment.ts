@@ -19,6 +19,31 @@ export interface ParsedOrder {
   capLimit: bigint;
 }
 
+interface UserData {
+  memberInfo: readonly unknown[];
+  orders: readonly unknown[];
+  isRegistered: boolean;
+  usdtBalance: bigint;
+  mmBalance: bigint;
+  allowance: bigint;
+  tokenLockResult: [bigint, bigint, number];
+  restartMMRelease: number;
+}
+
+interface ConfigData {
+  minInvestment: bigint;
+  capMultiplier: number;
+  dailyReturnRate: number;
+  withdrawalFeeBps: number;
+}
+
+const DEFAULT_CONFIG: ConfigData = {
+  minInvestment: parseUnits("100", USDT_DECIMALS),
+  capMultiplier: 250,
+  dailyReturnRate: 100,
+  withdrawalFeeBps: 500,
+};
+
 export function useInvestment(userAddress?: string) {
   const { signer, readProvider } = useWeb3();
   const queryClient = useQueryClient();
@@ -28,6 +53,7 @@ export function useInvestment(userAddress?: string) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
+  // Read-only contract instances
   const memePlus = useMemo(
     () => new Contract(ADDRESSES.MEMEPLUS, memePlusAbi as InterfaceAbi, readProvider),
     [readProvider]
@@ -41,7 +67,7 @@ export function useInvestment(userAddress?: string) {
     [readProvider]
   );
 
-  // Memoize signer-connected contract instances (avoid re-creating on every tx)
+  // Signer-connected contract instances (memoized to avoid re-creating on every tx)
   const memePlusWrite = useMemo(
     () => signer ? new Contract(ADDRESSES.MEMEPLUS, memePlusAbi as InterfaceAbi, signer) : null,
     [signer]
@@ -51,8 +77,13 @@ export function useInvestment(userAddress?: string) {
     [signer]
   );
 
-  // User data query
-  const { data: userData } = useQuery({
+  // User data query - changes frequently
+  const {
+    data: userData,
+    isLoading: isUserDataLoading,
+    isError: isUserDataError,
+    error: userDataError,
+  } = useQuery<UserData | null>({
     queryKey: ["investment", "userData", userAddress],
     queryFn: async () => {
       if (!userAddress) return null;
@@ -79,10 +110,13 @@ export function useInvestment(userAddress?: string) {
       };
     },
     enabled: !!userAddress,
+    refetchInterval: 15_000,
+    retry: 2,
+    placeholderData: (previousData) => previousData,
   });
 
-  // Config query (changes less often)
-  const { data: configData } = useQuery({
+  // Config query - changes rarely, longer cache
+  const { data: configData } = useQuery<ConfigData>({
     queryKey: ["investment", "config"],
     queryFn: async () => {
       const [minInv, capMul, dailyRate, wFee] = await Promise.all([
@@ -102,20 +136,15 @@ export function useInvestment(userAddress?: string) {
     refetchInterval: 300_000,
   });
 
-  const config = configData ?? {
-    minInvestment: parseUnits("100", USDT_DECIMALS),
-    capMultiplier: 250,
-    dailyReturnRate: 100,
-    withdrawalFeeBps: 500,
-  };
+  const config = configData ?? DEFAULT_CONFIG;
 
-  // Parse member info
+  // Derive member data from query results (no useMemo needed - cheap computations)
   const memberInfo = userData?.memberInfo;
-  const balance = memberInfo ? BigInt(memberInfo[9]) : 0n;
-  const totalInvested = memberInfo ? BigInt(memberInfo[7]) : 0n;
-  const totalWithdrawn = memberInfo ? BigInt(memberInfo[8]) : 0n;
-  const totalEarned = memberInfo ? BigInt(memberInfo[10]) : 0n;
-  const isActive = memberInfo ? memberInfo[3] : false;
+  const balance = memberInfo ? BigInt(memberInfo[9] as bigint) : 0n;
+  const totalInvested = memberInfo ? BigInt(memberInfo[7] as bigint) : 0n;
+  const totalWithdrawn = memberInfo ? BigInt(memberInfo[8] as bigint) : 0n;
+  const totalEarned = memberInfo ? BigInt(memberInfo[10] as bigint) : 0n;
+  const isActive = memberInfo ? Boolean(memberInfo[3]) : false;
   const capLimit = config.capMultiplier
     ? (totalInvested * BigInt(config.capMultiplier)) / 100n
     : 0n;
@@ -144,31 +173,32 @@ export function useInvestment(userAddress?: string) {
       ? bckTotalReleasableCapped - bckReleased
       : 0n;
 
-  // Parse orders (memoized to avoid recomputation on every render)
-  const parsedOrders = useMemo(
-    () =>
-      (userData?.orders || []).map((order: unknown, index: number) => {
-        const o = order as {
-          amount: bigint | number | string;
-          totalReturned: bigint | number | string;
-          createdAt: bigint | number | string;
-          lastClaimedAt: bigint | number | string;
-          isActive: boolean;
-        };
-        return {
+  // Parse orders - memoized since mapping involves allocation
+  const parsedOrders: ParsedOrder[] = useMemo(() => {
+    const rawOrders = userData?.orders;
+    if (!rawOrders || (rawOrders as unknown[]).length === 0) return [];
+
+    const multiplier = config.capMultiplier;
+    return (rawOrders as unknown[]).map((order: unknown, index: number) => {
+      const o = order as {
+        amount: bigint | number | string;
+        totalReturned: bigint | number | string;
+        createdAt: bigint | number | string;
+        lastClaimedAt: bigint | number | string;
+        isActive: boolean;
+      };
+      const amount = BigInt(o.amount);
+      return {
         id: index + 1,
-          amount: BigInt(o.amount),
-          totalReturned: BigInt(o.totalReturned),
-          createdAt: Number(o.createdAt),
-          lastClaimedAt: Number(o.lastClaimedAt),
-          isActive: o.isActive,
-          capLimit: config.capMultiplier
-            ? (BigInt(o.amount) * BigInt(config.capMultiplier)) / 100n
-            : 0n,
-        };
-      }),
-    [userData?.orders, config.capMultiplier]
-  );
+        amount,
+        totalReturned: BigInt(o.totalReturned),
+        createdAt: Number(o.createdAt),
+        lastClaimedAt: Number(o.lastClaimedAt),
+        isActive: o.isActive,
+        capLimit: multiplier ? (amount * BigInt(multiplier)) / 100n : 0n,
+      };
+    });
+  }, [userData?.orders, config.capMultiplier]);
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["investment", "userData", userAddress] });
@@ -176,12 +206,12 @@ export function useInvestment(userAddress?: string) {
 
   // Approve USDT
   const approve = useCallback(async (amount: bigint) => {
-    if (!usdtWrite) throw new Error("No signer");
+    if (!usdtWrite) throw new Error("No signer connected");
     setIsApproving(true);
     try {
       const tx = await usdtWrite.approve(ADDRESSES.MEMEPLUS, amount);
       await tx.wait();
-      return tx.hash;
+      return tx.hash as string;
     } finally {
       setIsApproving(false);
     }
@@ -189,7 +219,9 @@ export function useInvestment(userAddress?: string) {
 
   // Invest
   const invest = useCallback(async (amount: number, referrer: string) => {
-    if (!memePlusWrite) throw new Error("No signer");
+    if (!memePlusWrite) throw new Error("No signer connected");
+    if (amount <= 0) throw new Error("Invalid amount");
+
     const amountWei = parseUnits(amount.toString(), USDT_DECIMALS);
     const refAddress = referrer || ZERO_ADDRESS;
     const currentAllowance = userData?.allowance ?? 0n;
@@ -204,10 +236,14 @@ export function useInvestment(userAddress?: string) {
     setIsConfirmed(false);
     try {
       const tx = await memePlusWrite.invest(amountWei, refAddress);
+      setIsInvesting(false);
       await tx.wait();
       setIsConfirmed(true);
-      setTimeout(invalidate, 3000);
-      return tx.hash;
+      invalidate();
+      return tx.hash as string;
+    } catch (error) {
+      setIsConfirmed(false);
+      throw error;
     } finally {
       setIsInvesting(false);
       setIsConfirming(false);
@@ -216,7 +252,9 @@ export function useInvestment(userAddress?: string) {
 
   // Invest from income balance (no USDT approval needed)
   const investFromBalance = useCallback(async (amount: number, referrer: string) => {
-    if (!memePlusWrite) throw new Error("No signer");
+    if (!memePlusWrite) throw new Error("No signer connected");
+    if (amount <= 0) throw new Error("Invalid amount");
+
     const amountWei = parseUnits(amount.toString(), USDT_DECIMALS);
     const refAddress = referrer || ZERO_ADDRESS;
 
@@ -225,10 +263,14 @@ export function useInvestment(userAddress?: string) {
     setIsConfirmed(false);
     try {
       const tx = await memePlusWrite.investFromBalance(amountWei, refAddress);
+      setIsInvesting(false);
       await tx.wait();
       setIsConfirmed(true);
-      setTimeout(invalidate, 3000);
-      return tx.hash;
+      invalidate();
+      return tx.hash as string;
+    } catch (error) {
+      setIsConfirmed(false);
+      throw error;
     } finally {
       setIsInvesting(false);
       setIsConfirming(false);
@@ -237,10 +279,11 @@ export function useInvestment(userAddress?: string) {
 
   // Claim daily return
   const claimDailyReturn = useCallback(async () => {
-    if (!userAddress || !memePlusWrite) return;
+    if (!userAddress || !memePlusWrite) throw new Error("No signer connected");
     const tx = await memePlusWrite.claimDailyReturn(userAddress);
     await tx.wait();
     invalidate();
+    return tx.hash as string;
   }, [userAddress, memePlusWrite, invalidate]);
 
   return {
@@ -276,6 +319,9 @@ export function useInvestment(userAddress?: string) {
     isInvesting,
     isConfirming,
     isConfirmed,
+    isLoading: isUserDataLoading,
+    isError: isUserDataError,
+    error: userDataError,
     refetch: invalidate,
   };
 }

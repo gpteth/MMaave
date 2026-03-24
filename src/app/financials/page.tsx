@@ -44,6 +44,13 @@ export default function FinancialsPage() {
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   };
 
+  const formatSource = (source: string) => {
+    if (source.startsWith("0x") && source.length === 42) {
+      return `${source.slice(0, 6)}...${source.slice(-4)}`;
+    }
+    return source;
+  };
+
   const totalEarnedNum = Number(formatUnits(totalEarned, USDT_DECIMALS));
   const capLimitNum = Number(formatUnits(capLimit, USDT_DECIMALS));
   const capPercent = capLimitNum > 0 ? (totalEarnedNum / capLimitNum) * 100 : 0;
@@ -131,7 +138,7 @@ export default function FinancialsPage() {
                     <div key={i} className="bg-background rounded-lg p-3 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{record.name}</p>
-                        <p className="text-xs text-muted">{formatRecordTime(record.timestamp)}</p>
+                        <p className="text-xs text-muted">{formatSource(record.source)} · {formatRecordTime(record.timestamp)}</p>
                       </div>
                       <span className="font-mono text-sm font-bold text-success">+{formatNumber(Number(record.amount))}</span>
                     </div>
@@ -142,6 +149,7 @@ export default function FinancialsPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead>类型</TableHead>
+                        <TableHead>來源</TableHead>
                         <TableHead className="text-right">金额</TableHead>
                         <TableHead className="text-right">时间</TableHead>
                       </TableRow>
@@ -150,6 +158,7 @@ export default function FinancialsPage() {
                       {defiRecords.map((record, i) => (
                         <TableRow key={i}>
                           <TableCell>{record.name}</TableCell>
+                          <TableCell className="text-muted font-mono text-xs">{formatSource(record.source)}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-success">+{formatNumber(Number(record.amount))}</TableCell>
                           <TableCell className="text-right text-muted">{formatRecordTime(record.timestamp)}</TableCell>
                         </TableRow>
@@ -248,7 +257,7 @@ export default function FinancialsPage() {
                     <div key={i} className="bg-background rounded-lg p-3 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{record.name}</p>
-                        <p className="text-xs text-muted">{formatRecordTime(record.timestamp)}</p>
+                        <p className="text-xs text-muted">{formatSource(record.source)} · {formatRecordTime(record.timestamp)}</p>
                       </div>
                       <span className="font-mono text-sm font-bold text-success">+{formatNumber(Number(record.amount))}</span>
                     </div>
@@ -259,6 +268,7 @@ export default function FinancialsPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead>类型</TableHead>
+                        <TableHead>來源</TableHead>
                         <TableHead className="text-right">金额</TableHead>
                         <TableHead className="text-right">时间</TableHead>
                       </TableRow>
@@ -267,6 +277,7 @@ export default function FinancialsPage() {
                       {dynamicRecords.map((record, i) => (
                         <TableRow key={i}>
                           <TableCell>{record.name}</TableCell>
+                          <TableCell className="text-muted font-mono text-xs">{formatSource(record.source)}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-success">+{formatNumber(Number(record.amount))}</TableCell>
                           <TableCell className="text-right text-muted">{formatRecordTime(record.timestamp)}</TableCell>
                         </TableRow>
